@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "Live NFL play-type and outcome prediction"
 requires-python = ">=3.11"
 readme = "README.md"
-dependencies = []
+dependencies = [
+    "nflreadpy",
+    "polars",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -21,3 +24,8 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.pytest.ini_options]
+markers = [
+    "network: tests that hit external network resources (deselect with -m \"not network\")",
+]

@@ -18,15 +18,20 @@ docs/
 
 ## Setup (Windows / PowerShell)
 
+No virtual environment — just install straight onto your Python:
+
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
 ```
+
+In VS Code, make sure the selected interpreter (`Ctrl+Shift+P` -> Python: Select Interpreter) is your regular system Python, not a `.venv`.
 
 ## Development
 
 ```powershell
-ruff check .   # lint
-pytest         # test
+python -m ruff check .              # lint
+python -m pytest -m "not network"   # test (same as CI, no network calls)
+python -m pytest -m network         # test (includes tests that hit nflverse over the network)
 ```
+
+Using `python -m` instead of bare `ruff`/`pytest` avoids issues if their Scripts folder isn't on your PATH.
