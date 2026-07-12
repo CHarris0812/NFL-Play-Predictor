@@ -11,6 +11,8 @@ readme = "README.md"
 dependencies = [
     "nflreadpy",
     "polars",
+    "scikit-learn",
+    "xgboost",
 ]
 
 [project.optional-dependencies]
