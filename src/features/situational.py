@@ -33,17 +33,25 @@ LABEL_COLUMN = "play_type"
 ID_COLUMNS = ["season", "week", "game_id"]
 
 
-def build_dataset(pbp: pl.DataFrame) -> pl.DataFrame:
-    """Filter raw play-by-play down to a clean features+label dataset.
+def play_universe(pbp: pl.DataFrame, extra_columns: list[str] | None = None) -> pl.DataFrame:
+    """Filter raw play-by-play down to the shared feature-ready play set.
 
     Keeps only plays on downs 1-4 with a play_type in PLAY_TYPES, adds
-    an is_home indicator, and drops rows with nulls in any feature or
-    the label.
+    an is_home indicator, and drops rows with nulls in any selected
+    column. Shared by this module's build_dataset (labels: play type)
+    and features.outcome.build_dataset (labels: what happened on the
+    play) - same underlying plays and situational features either way.
     """
+    columns = ID_COLUMNS + FEATURE_COLUMNS + (extra_columns or [])
     return (
         pbp.filter(pl.col("down").is_in([1, 2, 3, 4]))
-        .filter(pl.col(LABEL_COLUMN).is_in(PLAY_TYPES))
+        .filter(pl.col("play_type").is_in(PLAY_TYPES))
         .with_columns((pl.col("posteam_type") == "home").alias("is_home"))
-        .select(ID_COLUMNS + FEATURE_COLUMNS + [LABEL_COLUMN])
+        .select(columns)
         .drop_nulls()
     )
+
+
+def build_dataset(pbp: pl.DataFrame) -> pl.DataFrame:
+    """Filter raw play-by-play down to a clean features+label dataset."""
+    return play_universe(pbp, extra_columns=[LABEL_COLUMN])
