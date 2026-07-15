@@ -6,11 +6,12 @@ A live NFL play predictor: given the current game state, predict the type of the
 
 ```
 data/            # raw/interim/processed data (gitignored beyond placeholders)
+artifacts/       # trained model files (gitignored, regenerate with scripts/train_*.py)
 notebooks/       # exploratory analysis
 src/
   ingestion/     # historical pull scripts + live feed client(s)
   features/      # shared feature-computation code (train + serve)
-  models/        # training code, model definitions
+  models/        # training code, model definitions, save/load
   serving/       # FastAPI app, live inference loop
 tests/
 docs/
