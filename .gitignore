@@ -27,6 +27,10 @@ data/processed/*
 *.sqlite
 *.duckdb
 
+# Trained model artifacts (regenerable via scripts/train_*.py)
+artifacts/*
+!artifacts/.gitkeep
+
 # Notebooks
 .ipynb_checkpoints/
 

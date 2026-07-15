@@ -5,8 +5,9 @@ reports accuracy/log-loss/confusion matrix for a season-based holdout.
 Requires the package to be installed first: pip install -e ".[dev]"
 """
 
-from features.situational import PLAY_TYPES, build_dataset
+from features.situational import FEATURE_COLUMNS, PLAY_TYPES, build_dataset
 from ingestion.nflverse import load_pbp
+from models.persistence import save_xgb_model
 from models.play_type_baseline import train_and_evaluate
 
 TRAIN_SEASONS = list(range(2016, 2023))  # 2016-2022
@@ -40,6 +41,11 @@ def main() -> None:
         print(result.report)
         print(f"Confusion matrix (rows=actual, cols=predicted), order={PLAY_TYPES}:")
         print(result.confusion)
+
+    xgb_result = next(r for r in results if r.name == "XGBoost")
+    save_xgb_model(xgb_result.model, "play_type", FEATURE_COLUMNS, sorted(PLAY_TYPES))
+    print()
+    print("Saved XGBoost model to artifacts/play_type.xgb.json")
 
 
 if __name__ == "__main__":

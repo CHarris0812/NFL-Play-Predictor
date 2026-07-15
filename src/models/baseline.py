@@ -23,6 +23,7 @@ class EvalResult:
     log_loss: float
     report: str
     confusion: np.ndarray
+    model: object
 
 
 def _to_arrays(
@@ -32,7 +33,7 @@ def _to_arrays(
 
 
 def _evaluate(
-    name: str, y_test, y_pred, y_proba, proba_labels, display_labels: list[str]
+    name: str, y_test, y_pred, y_proba, proba_labels, display_labels: list[str], model: object
 ) -> EvalResult:
     return EvalResult(
         name=name,
@@ -40,6 +41,7 @@ def _evaluate(
         log_loss=log_loss(y_test, y_proba, labels=proba_labels),
         report=classification_report(y_test, y_pred, labels=display_labels, zero_division=0),
         confusion=confusion_matrix(y_test, y_pred, labels=display_labels),
+        model=model,
     )
 
 
@@ -73,6 +75,7 @@ def train_and_evaluate(
             logreg.predict_proba(X_test_scaled),
             logreg.classes_,
             classes,
+            logreg,
         )
     )
 
@@ -102,6 +105,7 @@ def train_and_evaluate(
             xgb.predict_proba(X_test),
             sorted_classes,
             classes,
+            xgb,
         )
     )
 
