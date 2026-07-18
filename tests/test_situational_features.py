@@ -1,6 +1,10 @@
+import itertools
+
 import polars as pl
 
 from features.situational import FEATURE_COLUMNS, LABEL_COLUMN, build_dataset
+
+_play_id = itertools.count(1)
 
 
 def _row(**overrides):
@@ -8,6 +12,9 @@ def _row(**overrides):
         "season": 2023,
         "week": 1,
         "game_id": "2023_01_AAA_BBB",
+        "play_id": next(_play_id),
+        "posteam": "AAA",
+        "defteam": "BBB",
         "down": 1,
         "ydstogo": 10,
         "yardline_100": 75,
@@ -18,13 +25,27 @@ def _row(**overrides):
         "defteam_timeouts_remaining": 3,
         "posteam_type": "home",
         "play_type": "run",
+        "epa": 0.0,
     }
     row.update(overrides)
     return row
 
 
+# Each of the 4 tendency columns (see features.tendency) is null until
+# there's at least one prior play of the relevant kind for that team - a
+# defense's EPA-allowed-on-pass stat, for instance, stays null until it's
+# faced a pass at least once. _warmup() gives one prior run and one prior
+# pass for the same offense/defense pair, which is enough prior history to
+# make every tendency column non-null for whatever comes after it. Without
+# this, every row in these tiny synthetic tests would be a "first play"
+# for at least one tendency column and get dropped for that reason instead
+# of whatever the test actually means to check.
+def _warmup():
+    return [_row(play_type="run"), _row(play_type="pass")]
+
+
 def test_keeps_real_scrimmage_plays():
-    df = pl.DataFrame([_row(play_type="run"), _row(play_type="pass")])
+    df = pl.DataFrame([*_warmup(), _row(play_type="run"), _row(play_type="pass")])
 
     out = build_dataset(df)
 
@@ -35,6 +56,7 @@ def test_keeps_real_scrimmage_plays():
 def test_drops_no_play_kickoff_and_kneel_spike():
     df = pl.DataFrame(
         [
+            *_warmup(),
             _row(play_type="run"),
             _row(play_type="no_play"),
             _row(play_type="kickoff", down=None),
@@ -51,15 +73,25 @@ def test_drops_no_play_kickoff_and_kneel_spike():
 
 
 def test_drops_rows_with_null_features():
-    df = pl.DataFrame([_row(play_type="run"), _row(play_type="pass", score_differential=None)])
+    df = pl.DataFrame(
+        [*_warmup(), _row(play_type="run"), _row(play_type="pass", score_differential=None)]
+    )
 
     out = build_dataset(df)
 
     assert out.shape[0] == 1
 
 
+def test_drops_a_teams_first_play_of_the_season_no_tendency_history():
+    df = pl.DataFrame([_row(play_type="run")])
+
+    out = build_dataset(df)
+
+    assert out.shape[0] == 0
+
+
 def test_is_home_derived_from_posteam_type():
-    df = pl.DataFrame([_row(posteam_type="home"), _row(posteam_type="away")])
+    df = pl.DataFrame([*_warmup(), _row(posteam_type="home"), _row(posteam_type="away")])
 
     out = build_dataset(df)
 
