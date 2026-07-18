@@ -32,7 +32,6 @@ class Situation(BaseModel):
     yardline_100: int
     score_differential: int
     qtr: int
-    game_seconds_remaining: int
     half_seconds_remaining: int
     posteam_timeouts_remaining: int
     defteam_timeouts_remaining: int

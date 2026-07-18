@@ -13,7 +13,6 @@ def _row(**overrides):
         "yardline_100": 75,
         "score_differential": 0,
         "qtr": 1,
-        "game_seconds_remaining": 3500,
         "half_seconds_remaining": 1700,
         "posteam_timeouts_remaining": 3,
         "defteam_timeouts_remaining": 3,

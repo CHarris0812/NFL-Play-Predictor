@@ -28,25 +28,24 @@ const FIELDS = [
   { key: "defteam_timeouts_remaining", label: "Defense timeouts left" },
 ];
 
-// The model was trained on game_seconds_remaining/half_seconds_remaining
-// (nflverse's own columns), but the clock a viewer actually sees on TV is
-// quarter + a minutes:seconds countdown within that quarter - so the form
-// collects the TV version and this converts it before calling the API.
+// The model was trained on half_seconds_remaining (nflverse's own column),
+// but the clock a viewer actually sees on TV is quarter + a minutes:seconds
+// countdown within that quarter - so the form collects the TV version and
+// this converts it before calling the API. (There's no game_seconds_remaining
+// feature: given qtr and half_seconds_remaining it's fully determined, so it
+// would add no information - see the model feature list for details.)
 function toApiPayload(situation) {
-  const { qtr, minutes_left_in_quarter, seconds_left_in_quarter, ...rest } = situation;
+  const { minutes_left_in_quarter, seconds_left_in_quarter, ...rest } = situation;
   const secondsInQuarter = minutes_left_in_quarter * 60 + seconds_left_in_quarter;
-
-  const regulationQuartersRemaining = qtr < 4 ? 4 - qtr : 0;
-  const game_seconds_remaining = secondsInQuarter + regulationQuartersRemaining * 15 * 60;
 
   // Q1/Q3 are the first quarter of their half, so the half has another
   // full quarter left after this one; Q2/Q4/OT are the half's last quarter.
-  const isFirstQuarterOfHalf = qtr === 1 || qtr === 3;
+  const isFirstQuarterOfHalf = rest.qtr === 1 || rest.qtr === 3;
   const half_seconds_remaining = isFirstQuarterOfHalf
     ? secondsInQuarter + 15 * 60
     : secondsInQuarter;
 
-  return { ...rest, qtr, game_seconds_remaining, half_seconds_remaining };
+  return { ...rest, half_seconds_remaining };
 }
 
 function ProbabilityList({ title, probabilities }) {

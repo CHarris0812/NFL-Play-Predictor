@@ -16,7 +16,6 @@ SITUATION = {
     "yardline_100": 5,
     "score_differential": 0,
     "qtr": 4,
-    "game_seconds_remaining": 110,
     "half_seconds_remaining": 110,
     "posteam_timeouts_remaining": 3,
     "defteam_timeouts_remaining": 3,

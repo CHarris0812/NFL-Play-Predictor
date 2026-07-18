@@ -20,7 +20,11 @@ FEATURE_COLUMNS = [
     "yardline_100",
     "score_differential",
     "qtr",
-    "game_seconds_remaining",
+    # game_seconds_remaining deliberately omitted: given qtr and
+    # half_seconds_remaining it's fully determined (game_seconds_remaining
+    # = half_seconds_remaining, +1800 if qtr is 1 or 3), so it would add no
+    # information - only noise for logistic regression and diluted SHAP
+    # attribution later.
     "half_seconds_remaining",
     "posteam_timeouts_remaining",
     "defteam_timeouts_remaining",
