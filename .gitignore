@@ -31,6 +31,9 @@ data/processed/*
 artifacts/*
 !artifacts/.gitkeep
 
+# Frontend
+node_modules/
+
 # Notebooks
 .ipynb_checkpoints/
 

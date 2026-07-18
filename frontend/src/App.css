@@ -1,0 +1,111 @@
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  font-family: system-ui, sans-serif;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+.card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 0.25rem;
+}
+
+.field input[type="number"] {
+  padding: 0.4rem;
+  font-size: 1rem;
+}
+
+.checkbox-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  grid-column: span 2;
+}
+
+button {
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0;
+}
+
+.error {
+  color: #b00020;
+}
+
+.results {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1.25rem;
+}
+
+.result-panel h3 {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 48px;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.bar-track {
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  height: 10px;
+}
+
+.bar-fill {
+  background: #2563eb;
+  height: 100%;
+}
+
+.bar-value {
+  text-align: right;
+}
+
+.log {
+  background: #111;
+  color: #ddd;
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}

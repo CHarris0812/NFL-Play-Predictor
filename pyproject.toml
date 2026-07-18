@@ -13,6 +13,8 @@ dependencies = [
     "polars",
     "scikit-learn",
     "xgboost",
+    "fastapi",
+    "uvicorn[standard]",
 ]
 
 [project.optional-dependencies]

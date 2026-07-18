@@ -13,4 +13,4 @@ def predict(saved: SavedModel, features: dict[str, float]) -> dict[str, float]:
     """
     x = np.array([[features[col] for col in saved.feature_columns]])
     proba = saved.model.predict_proba(x)[0]
-    return dict(zip(saved.classes, proba, strict=True))
+    return {label: float(p) for label, p in zip(saved.classes, proba, strict=True)}

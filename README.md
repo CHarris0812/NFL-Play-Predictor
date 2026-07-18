@@ -12,7 +12,8 @@ src/
   ingestion/     # historical pull scripts + live feed client(s)
   features/      # shared feature-computation code (train + serve)
   models/        # training code, model definitions, save/load
-  serving/       # FastAPI app, live inference loop
+  serving/       # FastAPI app (predict + train endpoints)
+frontend/        # React UI (Vite)
 tests/
 docs/
 ```
@@ -36,3 +37,19 @@ python -m pytest -m network         # test (includes tests that hit nflverse ove
 ```
 
 Using `python -m` instead of bare `ruff`/`pytest` avoids issues if their Scripts folder isn't on your PATH.
+
+## Running the app
+
+Two servers, in two terminals:
+
+```powershell
+python -m uvicorn serving.app:app --reload --app-dir src --port 8000
+```
+
+```powershell
+cd frontend
+npm install    # first time only
+npm run dev
+```
+
+Then open the URL `npm run dev` prints (usually http://localhost:5173). The backend needs `artifacts/play_type.xgb.json` and `artifacts/outcome.xgb.json` to exist before Predict will work - either run `scripts/train_baseline.py` and `scripts/train_outcome_baseline.py` first, or click "Train models" in the UI.
