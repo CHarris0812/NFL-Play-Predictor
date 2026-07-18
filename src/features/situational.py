@@ -8,6 +8,8 @@ later, live inference, so this is the single source of truth for what
 
 import polars as pl
 
+from features.tendency import TENDENCY_COLUMNS, add_tendency_features
+
 # Real offensive-play decisions only. Excludes no_play (penalty/timeout,
 # not an actual outcome - see the no_play investigation), kickoffs and
 # extra points (not a play-calling decision), and qb_kneel/qb_spike
@@ -29,6 +31,7 @@ FEATURE_COLUMNS = [
     "posteam_timeouts_remaining",
     "defteam_timeouts_remaining",
     "is_home",
+    *TENDENCY_COLUMNS,
 ]
 
 LABEL_COLUMN = "play_type"
@@ -40,15 +43,20 @@ ID_COLUMNS = ["season", "week", "game_id"]
 def play_universe(pbp: pl.DataFrame, extra_columns: list[str] | None = None) -> pl.DataFrame:
     """Filter raw play-by-play down to the shared feature-ready play set.
 
+    Adds rolling tendency features (see features.tendency) before
+    filtering, since those need the team's full play history to compute.
     Keeps only plays on downs 1-4 with a play_type in PLAY_TYPES, adds
     an is_home indicator, and drops rows with nulls in any selected
-    column. Shared by this module's build_dataset (labels: play type)
-    and features.outcome.build_dataset (labels: what happened on the
-    play) - same underlying plays and situational features either way.
+    column - including a team's first tendency-eligible play of the
+    season, which has no prior history to compute a rate from yet.
+    Shared by this module's build_dataset (labels: play type) and
+    features.outcome.build_dataset (labels: what happened on the play)
+    - same underlying plays and situational features either way.
     """
     columns = ID_COLUMNS + FEATURE_COLUMNS + (extra_columns or [])
     return (
-        pbp.filter(pl.col("down").is_in([1, 2, 3, 4]))
+        add_tendency_features(pbp)
+        .filter(pl.col("down").is_in([1, 2, 3, 4]))
         .filter(pl.col("play_type").is_in(PLAY_TYPES))
         .with_columns((pl.col("posteam_type") == "home").alias("is_home"))
         .select(columns)

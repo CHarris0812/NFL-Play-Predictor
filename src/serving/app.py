@@ -36,6 +36,14 @@ class Situation(BaseModel):
     posteam_timeouts_remaining: int
     defteam_timeouts_remaining: int
     is_home: bool
+    # Rolling season-to-date tendency stats (see features.tendency) - not
+    # something a viewer reads off the screen, so for now the frontend
+    # just asks the user to type in a number rather than looking a team
+    # up. Auto-filling these from real team stats is a natural follow-up.
+    posteam_run_rate: float
+    posteam_run_rate_this_down: float
+    defteam_epa_allowed_rush: float
+    defteam_epa_allowed_pass: float
 
 
 @app.get("/status")

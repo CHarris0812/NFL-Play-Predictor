@@ -14,6 +14,11 @@ const DEFAULT_SITUATION = {
   posteam_timeouts_remaining: 3,
   defteam_timeouts_remaining: 3,
   is_home: true,
+  // Rough league-average placeholders - see the TENDENCY_FIELDS note below.
+  posteam_run_rate: 0.42,
+  posteam_run_rate_this_down: 0.42,
+  defteam_epa_allowed_rush: 0.0,
+  defteam_epa_allowed_pass: 0.0,
 };
 
 const FIELDS = [
@@ -26,6 +31,18 @@ const FIELDS = [
   { key: "seconds_left_in_quarter", label: "Seconds left in quarter" },
   { key: "posteam_timeouts_remaining", label: "Offense timeouts left" },
   { key: "defteam_timeouts_remaining", label: "Defense timeouts left" },
+];
+
+// These are rolling season-to-date stats (see features/tendency.py), not
+// something a viewer can read off the screen - there's no team lookup
+// yet, so for now they're just manually-entered numbers like everything
+// else in the form. Auto-filling these from real team stats is a natural
+// follow-up once there's a team selector.
+const TENDENCY_FIELDS = [
+  { key: "posteam_run_rate", label: "Offense run rate (season)", step: 0.01 },
+  { key: "posteam_run_rate_this_down", label: "Offense run rate on this down", step: 0.01 },
+  { key: "defteam_epa_allowed_rush", label: "Defense EPA allowed per rush", step: 0.01 },
+  { key: "defteam_epa_allowed_pass", label: "Defense EPA allowed per pass", step: 0.01 },
 ];
 
 // The model was trained on half_seconds_remaining (nflverse's own column),
@@ -147,6 +164,25 @@ export default function App() {
             />
             Offense is home team
           </label>
+        </div>
+
+        <h3>Team tendency (season-to-date)</h3>
+        <p className="hint">
+          No team lookup yet - enter these manually. 0.42 run rate and 0.0 EPA allowed are
+          roughly league-average placeholders.
+        </p>
+        <div className="field-grid">
+          {TENDENCY_FIELDS.map(({ key, label, step }) => (
+            <label key={key} className="field">
+              {label}
+              <input
+                type="number"
+                step={step}
+                value={situation[key]}
+                onChange={(e) => updateField(key, Number(e.target.value))}
+              />
+            </label>
+          ))}
         </div>
 
         <button onClick={handlePredict} disabled={predicting}>
