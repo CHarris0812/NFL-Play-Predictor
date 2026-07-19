@@ -53,3 +53,13 @@ npm run dev
 ```
 
 Then open the URL `npm run dev` prints (usually http://localhost:5173). The backend needs `artifacts/play_type.xgb.json` and `artifacts/outcome.xgb.json` to exist before Predict will work - either run `scripts/train_baseline.py` and `scripts/train_outcome_baseline.py` first, or click "Train models" in the UI.
+
+## Simulating a live game
+
+`scripts/replay_game.py` replays a completed game play by play, predicting each one from only what was knowable at that point in time, then revealing what actually happened - a stand-in for the real live feed while that doesn't exist yet, and a fast way to test the prediction loop without waiting for an actual live game. 2023 is our held-out test season, so any 2023 game is an honest dry run.
+
+```powershell
+python scripts/replay_game.py                       # Super Bowl LVIII by default
+python scripts/replay_game.py 2023_01_DET_KC         # any 2023 game_id
+python scripts/replay_game.py 2023_01_DET_KC 2       # add a 2-second delay per play
+```

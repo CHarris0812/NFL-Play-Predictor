@@ -16,23 +16,26 @@ OUTCOMES = ["touchdown", "turnover", "first_down", "no_first_down"]
 
 LABEL_COLUMN = "outcome"
 
-_RAW_OUTCOME_COLUMNS = ["touchdown", "interception", "fumble_lost", "first_down"]
+# Public: serving.replay also needs these to build a combined dataset
+# carrying both this module's label and features.situational's.
+RAW_OUTCOME_COLUMNS = ["touchdown", "interception", "fumble_lost", "first_down"]
+
+
+def add_outcome_label(df: pl.DataFrame) -> pl.DataFrame:
+    """Add the outcome column to a frame that already has RAW_OUTCOME_COLUMNS."""
+    return df.with_columns(
+        pl.when(pl.col("touchdown") == 1)
+        .then(pl.lit("touchdown"))
+        .when((pl.col("interception") == 1) | (pl.col("fumble_lost") == 1))
+        .then(pl.lit("turnover"))
+        .when(pl.col("first_down") == 1)
+        .then(pl.lit("first_down"))
+        .otherwise(pl.lit("no_first_down"))
+        .alias(LABEL_COLUMN)
+    )
 
 
 def build_dataset(pbp: pl.DataFrame) -> pl.DataFrame:
     """Filter raw play-by-play down to a clean features+outcome dataset."""
-    df = play_universe(pbp, extra_columns=_RAW_OUTCOME_COLUMNS)
-
-    return (
-        df.with_columns(
-            pl.when(pl.col("touchdown") == 1)
-            .then(pl.lit("touchdown"))
-            .when((pl.col("interception") == 1) | (pl.col("fumble_lost") == 1))
-            .then(pl.lit("turnover"))
-            .when(pl.col("first_down") == 1)
-            .then(pl.lit("first_down"))
-            .otherwise(pl.lit("no_first_down"))
-            .alias(LABEL_COLUMN)
-        )
-        .select(ID_COLUMNS + FEATURE_COLUMNS + [LABEL_COLUMN])
-    )
+    df = play_universe(pbp, extra_columns=RAW_OUTCOME_COLUMNS)
+    return add_outcome_label(df).select(ID_COLUMNS + FEATURE_COLUMNS + [LABEL_COLUMN])

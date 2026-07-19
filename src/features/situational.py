@@ -36,8 +36,8 @@ FEATURE_COLUMNS = [
 
 LABEL_COLUMN = "play_type"
 
-# Carried through for splitting/grouping, not used as model inputs.
-ID_COLUMNS = ["season", "week", "game_id"]
+# Carried through for splitting/grouping/ordering, not used as model inputs.
+ID_COLUMNS = ["season", "week", "game_id", "play_id"]
 
 
 def play_universe(pbp: pl.DataFrame, extra_columns: list[str] | None = None) -> pl.DataFrame:
