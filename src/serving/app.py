@@ -11,8 +11,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from ingestion.nflverse import load_pbp
 from models.persistence import load_xgb_model
 from models.predict import predict
+from serving.replay import build_game_replay
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -71,6 +73,23 @@ def predict_situation(situation: Situation):
         "play_type": predict(play_type_model, features),
         "outcome": predict(outcome_model, features),
     }
+
+
+@app.get("/replay/{game_id}")
+def replay(game_id: str):
+    """A completed game's plays in order, with features and actual labels
+    attached, for the frontend's replay tab to step through one at a
+    time (predicting each via /predict, then revealing what's here)."""
+    try:
+        season = int(game_id.split("_")[0])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid game_id: {game_id!r}") from e
+
+    game = build_game_replay(load_pbp([season]), game_id)
+    if game.shape[0] == 0:
+        raise HTTPException(status_code=404, detail=f"No plays found for game_id={game_id!r}")
+
+    return {"game_id": game_id, "plays": game.to_dicts()}
 
 
 def _run_script(script_name: str) -> str:
