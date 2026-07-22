@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fetchReplay, predictSituation } from "./api";
+import { fetchReplay } from "./api";
 
 // Super Bowl LVIII: 2023 season, week 22, San Francisco at Kansas City.
 const DEFAULT_GAME = { year: 2023, week: 22, away: "SF", home: "KC" };
@@ -17,15 +17,8 @@ export default function ReplayTab() {
   const [game, setGame] = useState(DEFAULT_GAME);
   const [gameId, setGameId] = useState(null);
   const [plays, setPlays] = useState(null);
-  const [index, setIndex] = useState(0);
-  const [revealed, setRevealed] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [advancing, setAdvancing] = useState(false);
   const [error, setError] = useState(null);
-
-  const atEnd = plays !== null && index >= plays.length;
-  const playTypeCorrect = revealed.filter((r) => r.playTypeHit).length;
-  const outcomeCorrect = revealed.filter((r) => r.outcomeHit).length;
 
   function updateGame(key, value) {
     setGame((prev) => ({ ...prev, [key]: value }));
@@ -35,8 +28,6 @@ export default function ReplayTab() {
     setLoading(true);
     setError(null);
     setPlays(null);
-    setRevealed([]);
-    setIndex(0);
     try {
       const data = await fetchReplay(toGameId(game));
       setGameId(data.game_id);
@@ -48,36 +39,20 @@ export default function ReplayTab() {
     }
   }
 
-  async function handleNextPlay() {
-    if (!plays || index >= plays.length) return;
-
-    setAdvancing(true);
-    setError(null);
-    try {
-      const play = plays[index];
-      const prediction = await predictSituation(play);
-
-      const [predictedPlayType] = topChoice(prediction.play_type);
-      const [predictedOutcome] = topChoice(prediction.outcome);
-
-      setRevealed((prev) => [
-        ...prev,
-        {
-          play,
-          prediction,
-          predictedPlayType,
-          predictedOutcome,
-          playTypeHit: predictedPlayType === play.play_type,
-          outcomeHit: predictedOutcome === play.outcome,
-        },
-      ]);
-      setIndex((i) => i + 1);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAdvancing(false);
-    }
-  }
+  const rows = (plays ?? []).map((play) => {
+    const [predictedPlayType] = topChoice(play.predicted_play_type);
+    const [predictedOutcome] = topChoice(play.predicted_outcome);
+    return {
+      play,
+      predictedPlayType,
+      predictedOutcome,
+      playTypeProb: play.predicted_play_type[predictedPlayType],
+      playTypeHit: predictedPlayType === play.play_type,
+      outcomeHit: predictedOutcome === play.outcome,
+    };
+  });
+  const playTypeCorrect = rows.filter((r) => r.playTypeHit).length;
+  const outcomeCorrect = rows.filter((r) => r.outcomeHit).length;
 
   return (
     <section className="card">
@@ -127,24 +102,19 @@ export default function ReplayTab() {
       {plays && (
         <>
           <p className="hint">
-            {gameId}: play {Math.min(index + 1, plays.length)} of {plays.length}
-            {revealed.length > 0 &&
-              ` | play-type ${playTypeCorrect}/${revealed.length} | outcome ${outcomeCorrect}/${revealed.length}`}
+            {gameId}: {plays.length} plays | play-type {playTypeCorrect}/{plays.length} | outcome{" "}
+            {outcomeCorrect}/{plays.length}
           </p>
 
-          <button onClick={handleNextPlay} disabled={advancing || atEnd}>
-            {atEnd ? "Game complete" : advancing ? "Predicting..." : "Next play"}
-          </button>
-
           <div className="replay-log">
-            {revealed.map((r, i) => (
+            {rows.map((r, i) => (
               <div className="replay-row" key={i}>
                 <span className="replay-situation">
                   Q{r.play.qtr} {r.play.down}&{r.play.ydstogo}, {r.play.yardline_100} yds from
                   end zone
                 </span>
                 <span className={r.playTypeHit ? "replay-hit" : "replay-miss"}>
-                  play: {r.predictedPlayType} ({(r.prediction.play_type[r.predictedPlayType] * 100).toFixed(0)}%) -&gt;{" "}
+                  play: {r.predictedPlayType} ({(r.playTypeProb * 100).toFixed(0)}%) -&gt;{" "}
                   {r.play.play_type}
                 </span>
                 <span className={r.outcomeHit ? "replay-hit" : "replay-miss"}>
