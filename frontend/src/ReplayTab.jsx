@@ -1,14 +1,20 @@
 import { useState } from "react";
 import { fetchReplay, predictSituation } from "./api";
 
-const DEFAULT_GAME_ID = "2023_22_SF_KC"; // Super Bowl LVIII
+// Super Bowl LVIII: 2023 season, week 22, San Francisco at Kansas City.
+const DEFAULT_GAME = { year: 2023, week: 22, away: "SF", home: "KC" };
 
 function topChoice(probabilities) {
   return Object.entries(probabilities).sort((a, b) => b[1] - a[1])[0];
 }
 
+// nflverse's game_id format: {season}_{week, zero-padded}_{away}_{home}.
+function toGameId({ year, week, away, home }) {
+  return `${year}_${String(week).padStart(2, "0")}_${away.toUpperCase()}_${home.toUpperCase()}`;
+}
+
 export default function ReplayTab() {
-  const [gameIdInput, setGameIdInput] = useState(DEFAULT_GAME_ID);
+  const [game, setGame] = useState(DEFAULT_GAME);
   const [gameId, setGameId] = useState(null);
   const [plays, setPlays] = useState(null);
   const [index, setIndex] = useState(0);
@@ -21,6 +27,10 @@ export default function ReplayTab() {
   const playTypeCorrect = revealed.filter((r) => r.playTypeHit).length;
   const outcomeCorrect = revealed.filter((r) => r.outcomeHit).length;
 
+  function updateGame(key, value) {
+    setGame((prev) => ({ ...prev, [key]: value }));
+  }
+
   async function handleLoadGame() {
     setLoading(true);
     setError(null);
@@ -28,7 +38,7 @@ export default function ReplayTab() {
     setRevealed([]);
     setIndex(0);
     try {
-      const data = await fetchReplay(gameIdInput.trim());
+      const data = await fetchReplay(toGameId(game));
       setGameId(data.game_id);
       setPlays(data.plays);
     } catch (err) {
@@ -72,19 +82,38 @@ export default function ReplayTab() {
   return (
     <section className="card">
       <h2>Replay a game</h2>
-      <p className="hint">
-        Steps through a completed game's plays in order, predicting each one before revealing
-        what actually happened - a stand-in for a live feed, using a game the models never
-        trained on (2023 is held out for testing).
-      </p>
 
       <div className="field-grid">
         <label className="field">
-          Game ID
+          Year
+          <input
+            type="number"
+            value={game.year}
+            onChange={(e) => updateGame("year", Number(e.target.value))}
+          />
+        </label>
+        <label className="field">
+          Week
+          <input
+            type="number"
+            value={game.week}
+            onChange={(e) => updateGame("week", Number(e.target.value))}
+          />
+        </label>
+        <label className="field">
+          Away team
           <input
             type="text"
-            value={gameIdInput}
-            onChange={(e) => setGameIdInput(e.target.value)}
+            value={game.away}
+            onChange={(e) => updateGame("away", e.target.value)}
+          />
+        </label>
+        <label className="field">
+          Home team
+          <input
+            type="text"
+            value={game.home}
+            onChange={(e) => updateGame("home", e.target.value)}
           />
         </label>
       </div>
