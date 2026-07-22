@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from ingestion.nflverse import load_pbp
 from models.persistence import load_xgb_model
-from models.predict import predict
+from models.predict import predict, predict_batch
 from serving.replay import build_game_replay
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -77,9 +77,11 @@ def predict_situation(situation: Situation):
 
 @app.get("/replay/{game_id}")
 def replay(game_id: str):
-    """A completed game's plays in order, with features and actual labels
-    attached, for the frontend's replay tab to step through one at a
-    time (predicting each via /predict, then revealing what's here)."""
+    """A completed game's plays in order, each with a prediction and the
+    actual result attached, for the frontend's replay tab to display all
+    at once. Predictions are batched - one model load and one vectorized
+    predict_proba call per model, not one round trip per play - so this
+    stays fast even for a full game."""
     try:
         season = int(game_id.split("_")[0])
     except ValueError as e:
@@ -89,7 +91,25 @@ def replay(game_id: str):
     if game.shape[0] == 0:
         raise HTTPException(status_code=404, detail=f"No plays found for game_id={game_id!r}")
 
-    return {"game_id": game_id, "plays": game.to_dicts()}
+    plays = game.to_dicts()
+
+    try:
+        play_type_model = load_xgb_model("play_type")
+        outcome_model = load_xgb_model("outcome")
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=404, detail="No trained model found - click Train models first."
+        ) from e
+
+    play_type_preds = predict_batch(play_type_model, plays)
+    outcome_preds = predict_batch(outcome_model, plays)
+    for play, play_type_pred, outcome_pred in zip(
+        plays, play_type_preds, outcome_preds, strict=True
+    ):
+        play["predicted_play_type"] = play_type_pred
+        play["predicted_outcome"] = outcome_pred
+
+    return {"game_id": game_id, "plays": plays}
 
 
 def _run_script(script_name: str) -> str:
