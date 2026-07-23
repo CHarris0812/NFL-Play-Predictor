@@ -21,14 +21,19 @@ from models.predict import predict
 PLAY_TYPE_COLUMN = LABEL_COLUMN  # "play_type" - named for clarity alongside "outcome"
 OUTCOME_COLUMN = "outcome"
 
+# Not model features - just human-readable context about the real play,
+# shown alongside the prediction. "desc" is nflverse's own broadcast-style
+# text description (player names, yardage, etc.), so no need to build one.
+DISPLAY_COLUMNS = ["posteam", "desc"]
+
 
 def build_game_replay(pbp: pl.DataFrame, game_id: str) -> pl.DataFrame:
     """One game's plays, in order, with features and both actual labels attached."""
-    extra = [PLAY_TYPE_COLUMN, *RAW_OUTCOME_COLUMNS]
+    extra = [PLAY_TYPE_COLUMN, *RAW_OUTCOME_COLUMNS, *DISPLAY_COLUMNS]
     df = add_outcome_label(play_universe(pbp, extra_columns=extra))
     return (
         df.filter(pl.col("game_id") == game_id)
-        .select([*ID_COLUMNS, *FEATURE_COLUMNS, PLAY_TYPE_COLUMN, OUTCOME_COLUMN])
+        .select([*ID_COLUMNS, *FEATURE_COLUMNS, PLAY_TYPE_COLUMN, OUTCOME_COLUMN, *DISPLAY_COLUMNS])
         .sort("play_id")
     )
 
@@ -70,13 +75,14 @@ def run_replay(game_id: str, season: int, delay_seconds: float = 0.0) -> None:
         outcome_correct += outcome_hit
 
         print(
-            f"[{i:>3}/{n}] Q{row['qtr']:.0f} {row['down']:.0f}&{row['ydstogo']:.0f}, "
+            f"[{i:>3}/{n}] {row['posteam']} Q{row['qtr']:.0f} {row['down']:.0f}&{row['ydstogo']:.0f}, "
             f"{row['yardline_100']:.0f} yds from end zone | "
             f"play: {predicted_play_type} ({play_type_probs[predicted_play_type]:.0%}) "
             f"-> {row[PLAY_TYPE_COLUMN]} [{'y' if play_type_hit else 'n'}] | "
             f"outcome: {predicted_outcome} -> {row[OUTCOME_COLUMN]} "
             f"[{'y' if outcome_hit else 'n'}]"
         )
+        print(f"        {row['desc']}")
 
         if delay_seconds:
             time.sleep(delay_seconds)

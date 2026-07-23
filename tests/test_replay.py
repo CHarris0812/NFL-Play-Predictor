@@ -25,6 +25,7 @@ def _row(**overrides):
         "defteam_timeouts_remaining": 3,
         "posteam_type": "home",
         "play_type": "run",
+        "desc": "some play description",
         "epa": 0.0,
         "touchdown": 0,
         "interception": 0,
@@ -55,6 +56,8 @@ def test_replay_returns_only_the_requested_game_in_play_order():
     assert out.sort("play_id")["play_id"].to_list() == sorted(out["play_id"].to_list())
     assert out[PLAY_TYPE_COLUMN].to_list() == ["pass", "run"]
     assert out[OUTCOME_COLUMN].to_list() == ["first_down", "touchdown"]
+    assert out["posteam"].to_list() == ["AAA", "AAA"]
+    assert out["desc"].to_list() == ["some play description", "some play description"]
 
 
 def test_replay_unknown_game_id_returns_empty():

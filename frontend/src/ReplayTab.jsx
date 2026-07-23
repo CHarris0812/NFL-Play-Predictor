@@ -145,8 +145,8 @@ export default function ReplayTab() {
                     onClick={() => setExpandedIndex(isExpanded ? null : i)}
                   >
                     <span className="replay-situation">
-                      Q{r.play.qtr} {r.play.down}&{r.play.ydstogo}, {r.play.yardline_100} yds
-                      from end zone
+                      {r.play.posteam} ball, Q{r.play.qtr} {r.play.down}&{r.play.ydstogo},{" "}
+                      {r.play.yardline_100} yds from end zone
                     </span>
                     <span className={r.playTypeHit ? "replay-hit" : "replay-miss"}>
                       play: {r.predictedPlayType} ({(r.playTypeProb * 100).toFixed(0)}%) -&gt;{" "}
@@ -160,6 +160,7 @@ export default function ReplayTab() {
 
                   {isExpanded && (
                     <div className="replay-detail">
+                      <p className="replay-desc">{r.play.desc}</p>
                       <div className="replay-detail-features">
                         {FEATURE_LABELS.map(({ key, label }) => (
                           <div className="replay-detail-feature" key={key}>
