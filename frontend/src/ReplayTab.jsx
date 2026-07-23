@@ -74,6 +74,7 @@ export default function ReplayTab() {
       predictedPlayType,
       predictedOutcome,
       playTypeProb: play.predicted_play_type[predictedPlayType],
+      outcomeProb: play.predicted_outcome[predictedOutcome],
       playTypeHit: predictedPlayType === play.play_type,
       outcomeHit: predictedOutcome === play.outcome,
     };
@@ -152,7 +153,8 @@ export default function ReplayTab() {
                       {r.play.play_type}
                     </span>
                     <span className={r.outcomeHit ? "replay-hit" : "replay-miss"}>
-                      outcome: {r.predictedOutcome} -&gt; {r.play.outcome}
+                      outcome: {r.predictedOutcome} ({(r.outcomeProb * 100).toFixed(0)}%) -&gt;{" "}
+                      {r.play.outcome}
                     </span>
                   </div>
 
