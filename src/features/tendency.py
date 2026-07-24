@@ -13,11 +13,23 @@ already happened):
   all game so far. Computed separately per team (offense and defense
   each get their own game-scoped number), since one team's hot streak
   says nothing about the other team's.
+
+The this-game numbers are shrunk toward that same team's season-to-date
+number (see _shrunk_ratio) - confirmed empirically
+(scripts/analyze_accuracy_by_game_progress.py) that without this, a
+single early-game play could swing the raw in-game average wildly and
+measurably hurt accuracy in the first few plays of a game.
 """
 
 import polars as pl
 
 _TIME_ORDER = ["season", "week", "game_id", "play_id"]
+
+# How much weight the season-long prior gets when blending into an
+# in-game estimate, in units of "in-game attempts" - see _shrunk_ratio.
+# 10 means a team needs roughly 10 real attempts this game before its
+# in-game number starts to outweigh its season-long one.
+_SHRINKAGE_K = 10
 
 TENDENCY_COLUMNS = [
     "posteam_run_rate",
@@ -31,11 +43,41 @@ TENDENCY_COLUMNS = [
 ]
 
 
-def _prior_ratio(numerator: str, denominator: str, partition_by: list[str]) -> pl.Expr:
-    """Expanding numerator/denominator, computed before the current row."""
+def _prior_sum_count(
+    numerator: str, denominator: str, partition_by: list[str]
+) -> tuple[pl.Expr, pl.Expr]:
+    """Expanding (sum, count) of numerator/denominator, before the current row."""
     prior_num = pl.col(numerator).cum_sum().over(partition_by).shift(1).over(partition_by)
     prior_den = pl.col(denominator).cum_sum().over(partition_by).shift(1).over(partition_by)
+    return prior_num, prior_den
+
+
+def _prior_ratio(numerator: str, denominator: str, partition_by: list[str]) -> pl.Expr:
+    """Expanding numerator/denominator, computed before the current row."""
+    prior_num, prior_den = _prior_sum_count(numerator, denominator, partition_by)
     return pl.when(prior_den > 0).then(prior_num / prior_den).otherwise(None)
+
+
+def _shrunk_ratio(
+    numerator: str, denominator: str, game_partition: list[str], season_prior: pl.Expr
+) -> pl.Expr:
+    """In-game numerator/denominator, shrunk toward season_prior by _SHRINKAGE_K.
+
+    A team's raw in-game average is noisy with only a handful of plays
+    behind it - one stuffed carry shouldn't convince the model this team
+    can't run at all. Blending it toward that team's own season-long
+    number (weighted by _SHRINKAGE_K "phantom" attempts) fixes that: with
+    0 real attempts this game the estimate is just the season prior, and
+    it gradually shifts to reflect what's actually happening today as
+    real attempts accumulate. Unlike a plain ratio, this is never null -
+    even on a team's first play of the game there's still a season prior
+    to fall back to (or 0.0, a neutral EPA value, if even that's missing).
+    """
+    prior_num, prior_den = _prior_sum_count(numerator, denominator, game_partition)
+    prior_num = prior_num.fill_null(0.0)
+    prior_den = prior_den.fill_null(0)
+    prior_value = season_prior.fill_null(0.0)
+    return (prior_num + _SHRINKAGE_K * prior_value) / (prior_den + _SHRINKAGE_K)
 
 
 def add_tendency_features(pbp: pl.DataFrame) -> pl.DataFrame:
@@ -58,8 +100,9 @@ def add_tendency_features(pbp: pl.DataFrame) -> pl.DataFrame:
         pl.when(is_pass).then(pl.col("epa")).otherwise(0.0).alias("_pass_epa"),
     )
 
-    return df.with_columns(
-        # Season-to-date.
+    # Season-to-date ratios first - the in-game ones below shrink toward
+    # these as their prior, so they need to already exist as columns.
+    df = df.with_columns(
         _prior_ratio("_is_run", "_is_scrimmage", ["season", "posteam"]).alias(
             "posteam_run_rate"
         ),
@@ -72,18 +115,39 @@ def add_tendency_features(pbp: pl.DataFrame) -> pl.DataFrame:
         _prior_ratio("_pass_epa", "_is_pass", ["season", "defteam"]).alias(
             "defteam_epa_allowed_pass"
         ),
-        # This game only - same ratios, windowed to game_id instead of
-        # season, and computed for both sides of the ball.
-        _prior_ratio("_rush_epa", "_is_run", ["game_id", "posteam"]).alias(
-            "posteam_epa_this_game_rush"
+        # Same shape of stat for the offense's own season rushing/passing
+        # efficiency, kept private - only used below as the shrinkage
+        # prior, not exposed as its own feature (out of scope for the
+        # in-game noise fix this is here for).
+        _prior_ratio("_rush_epa", "_is_run", ["season", "posteam"]).alias(
+            "_posteam_epa_season_rush"
         ),
-        _prior_ratio("_pass_epa", "_is_pass", ["game_id", "posteam"]).alias(
-            "posteam_epa_this_game_pass"
+        _prior_ratio("_pass_epa", "_is_pass", ["season", "posteam"]).alias(
+            "_posteam_epa_season_pass"
         ),
-        _prior_ratio("_rush_epa", "_is_run", ["game_id", "defteam"]).alias(
-            "defteam_epa_allowed_this_game_rush"
-        ),
-        _prior_ratio("_pass_epa", "_is_pass", ["game_id", "defteam"]).alias(
-            "defteam_epa_allowed_this_game_pass"
-        ),
-    ).drop(["_is_run", "_is_pass", "_is_scrimmage", "_rush_epa", "_pass_epa"])
+    )
+
+    return df.with_columns(
+        _shrunk_ratio(
+            "_rush_epa", "_is_run", ["game_id", "posteam"], pl.col("_posteam_epa_season_rush")
+        ).alias("posteam_epa_this_game_rush"),
+        _shrunk_ratio(
+            "_pass_epa", "_is_pass", ["game_id", "posteam"], pl.col("_posteam_epa_season_pass")
+        ).alias("posteam_epa_this_game_pass"),
+        _shrunk_ratio(
+            "_rush_epa", "_is_run", ["game_id", "defteam"], pl.col("defteam_epa_allowed_rush")
+        ).alias("defteam_epa_allowed_this_game_rush"),
+        _shrunk_ratio(
+            "_pass_epa", "_is_pass", ["game_id", "defteam"], pl.col("defteam_epa_allowed_pass")
+        ).alias("defteam_epa_allowed_this_game_pass"),
+    ).drop(
+        [
+            "_is_run",
+            "_is_pass",
+            "_is_scrimmage",
+            "_rush_epa",
+            "_pass_epa",
+            "_posteam_epa_season_rush",
+            "_posteam_epa_season_pass",
+        ]
+    )

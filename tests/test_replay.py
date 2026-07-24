@@ -37,26 +37,21 @@ def _row(**overrides):
 
 
 def test_replay_returns_only_the_requested_game_in_play_order():
-    # A prior week against a different game_id gives season-to-date
-    # tendency history; a run+pass warmup within the target game itself
-    # gives the in-game tendency features (features/tendency.py) their
-    # own required history too, so the two asserted rows below aren't
-    # dropped as "first play of this game" false starts. The warmup rows
-    # themselves are dropped for exactly that reason - they're the ones
-    # with no prior in-game history yet.
+    # A prior week against a different game_id gives the season-to-date
+    # tendency features (features/tendency.py) their required history,
+    # so the target game's own plays aren't dropped as "first play of
+    # the season" false starts. The in-game tendency features don't need
+    # a within-game warmup - they're shrunk toward the season prior and
+    # so are never null, even on a game's first play.
     season_warmup = [
         _row(week=1, game_id="2023_01_AAA_BBB", play_type="run"),
         _row(week=1, game_id="2023_01_AAA_BBB", play_type="pass"),
-    ]
-    game_warmup = [
-        _row(week=2, game_id="2023_02_AAA_CCC", play_type="run"),
-        _row(week=2, game_id="2023_02_AAA_CCC", play_type="pass"),
     ]
     target_game = [
         _row(week=2, game_id="2023_02_AAA_CCC", play_type="pass", first_down=1),
         _row(week=2, game_id="2023_02_AAA_CCC", play_type="run", touchdown=1),
     ]
-    df = pl.DataFrame([*season_warmup, *game_warmup, *target_game])
+    df = pl.DataFrame([*season_warmup, *target_game])
 
     out = build_game_replay(df, "2023_02_AAA_CCC")
 

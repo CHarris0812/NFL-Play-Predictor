@@ -1,4 +1,5 @@
 import polars as pl
+import pytest
 
 from features.tendency import add_tendency_features
 
@@ -54,7 +55,11 @@ def test_rolling_features_are_leak_free_and_correct():
 
 def test_in_game_features_track_each_team_separately_and_leak_free():
     # One game: A has the ball for plays 1-3, then B gets it for 4-5
-    # (e.g. a punt/turnover), then A gets it back for play 6.
+    # (e.g. a punt/turnover), then A gets it back for play 6. This is
+    # each team's only game this season, so the season-long prior each
+    # in-game number shrinks toward (see _shrunk_ratio) is built from
+    # the exact same plays as the in-game one - the shrunk value equals
+    # the raw in-game average here, it just doesn't leak across teams.
     df = pl.DataFrame(
         {
             "season": [2023] * 6,
@@ -72,8 +77,10 @@ def test_in_game_features_track_each_team_separately_and_leak_free():
     out = add_tendency_features(df)
     rows = out.sort("play_id").to_dicts()
 
-    # Play 1 (A's 1st play of the game): no in-game history for A yet.
-    assert rows[0]["posteam_epa_this_game_rush"] is None
+    # Play 1 (A's 1st play of the game): no in-game history for A yet -
+    # shrinks fully to the season prior, which is also empty -> 0.0, not
+    # null (a shrunk estimate is always defined, unlike a raw ratio).
+    assert rows[0]["posteam_epa_this_game_rush"] == 0.0
     # Play 2 (A's 2nd rush): prior rush is just play 1 -> avg 0.5.
     assert rows[1]["posteam_epa_this_game_rush"] == 0.5
     # B has not played a single down of this game yet - B's in-game
@@ -82,11 +89,12 @@ def test_in_game_features_track_each_team_separately_and_leak_free():
     assert rows[1]["defteam_epa_allowed_this_game_rush"] == 0.5
 
     # Play 4 (B's 1st play of the game, on offense): B has never had the
-    # ball this game - must be null, regardless of A's plays 1-3 above.
-    assert rows[3]["posteam_epa_this_game_rush"] is None
+    # ball this game - 0.0 (no history either side), regardless of A's
+    # plays 1-3 above.
+    assert rows[3]["posteam_epa_this_game_rush"] == 0.0
     # And A, now on defense for the first time this game, has no prior
     # defensive history either, even though A has offensive history.
-    assert rows[3]["defteam_epa_allowed_this_game_rush"] is None
+    assert rows[3]["defteam_epa_allowed_this_game_rush"] == 0.0
 
     # Play 5 (B's 2nd rush): prior is just play 4 -> avg 0.3. Unaffected
     # by A's unrelated offensive numbers from plays 1-3.
@@ -101,7 +109,48 @@ def test_in_game_features_track_each_team_separately_and_leak_free():
     assert rows[5]["defteam_epa_allowed_this_game_rush"] == 0.0
 
 
-def test_in_game_features_reset_between_games_even_same_team_same_season():
+def test_in_game_features_shrink_toward_season_prior_not_raw_in_game_average():
+    # Team A: 3 great rushes in an earlier game (g0) this season, epa=1.0
+    # each -> season prior entering g1 is 1.0. Then in g1, a run of bad
+    # rushes (epa=-5.0). A single bad play shouldn't swing the in-game
+    # estimate all the way to -5 - it should stay anchored near the
+    # season prior early on, then drift toward -5 as more bad plays pile
+    # up (see scripts/analyze_accuracy_by_game_progress.py, which is what
+    # motivated this: early-game predictions were measurably less
+    # accurate before this shrinkage existed).
+    df = pl.DataFrame(
+        {
+            "season": [2023] * 6,
+            "week": [1, 1, 1, 2, 2, 2],
+            "game_id": ["g0", "g0", "g0", "g1", "g1", "g1"],
+            "play_id": [1, 2, 3, 1, 2, 3],
+            "posteam": ["A"] * 6,
+            "defteam": ["B", "B", "B", "C", "C", "C"],
+            "down": [1] * 6,
+            "play_type": ["run"] * 6,
+            "epa": [1.0, 1.0, 1.0, -5.0, -5.0, -5.0],
+        }
+    )
+
+    out = add_tendency_features(df)
+    g1_rows = out.sort("play_id").filter(pl.col("game_id") == "g1").to_dicts()
+
+    # Play 1 of g1: 0 in-game attempts -> falls back entirely to the
+    # season prior from g0 (1.0), not the -5.0 this play itself scored.
+    assert g1_rows[0]["posteam_epa_this_game_rush"] == 1.0
+
+    # Play 2: 1 bad in-game attempt (-5.0) blended with the season prior
+    # (which has itself updated to include play 1: (1+1+1-5)/4 = -0.5,
+    # since the season prior is leak-free and play 1 already happened).
+    # (-5.0 + 10*-0.5) / (1+10) = -10/11.
+    assert g1_rows[1]["posteam_epa_this_game_rush"] == pytest.approx(-10 / 11)
+
+    # It's trending toward the bad in-game reality, but still nowhere
+    # near the raw in-game average of -5.0 after just one attempt.
+    assert g1_rows[1]["posteam_epa_this_game_rush"] > -5.0
+
+
+def test_in_game_features_never_null_even_with_no_season_history():
     df = pl.DataFrame(
         {
             "season": [2023, 2023],
@@ -118,10 +167,11 @@ def test_in_game_features_reset_between_games_even_same_team_same_season():
 
     out = add_tendency_features(df)
 
-    # A's first play of g2 has no in-game history, even though A has
-    # season-to-date history from g1 (posteam_run_rate would be non-null).
+    # A's first play of g2 has no in-game history, but still gets a real
+    # (shrunk-to-season-prior) value rather than null - unlike a raw
+    # ratio, which would be null here (see the season-to-date tests).
     g2_row = out.filter(pl.col("game_id") == "g2").to_dicts()[0]
-    assert g2_row["posteam_epa_this_game_rush"] is None
+    assert g2_row["posteam_epa_this_game_rush"] is not None
     assert g2_row["posteam_run_rate"] == 1.0  # season-to-date still carries over
 
 
