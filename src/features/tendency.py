@@ -1,9 +1,18 @@
 """Rolling team tendency features.
 
-Each stat is computed strictly from a team's own prior plays this
-season - never the play being predicted, never anything after it. That
-makes this safe to use for both training and live inference: at
-prediction time you only ever know what already happened.
+Two kinds of rolling stat, both strictly from prior plays - never the
+play being predicted, never anything after it (safe for both training
+and live inference, since at prediction time you only ever know what
+already happened):
+
+- Season-to-date: a team's overall tendency this season, resets each
+  season. Good for "is this generally a run-heavy team."
+- This-game: the same shape of stat, but windowed to just the plays
+  already run in the CURRENT game. A season average dilutes in-game
+  momentum - e.g. a normally strong rushing offense that's been stuffed
+  all game so far. Computed separately per team (offense and defense
+  each get their own game-scoped number), since one team's hot streak
+  says nothing about the other team's.
 """
 
 import polars as pl
@@ -15,6 +24,10 @@ TENDENCY_COLUMNS = [
     "posteam_run_rate_this_down",
     "defteam_epa_allowed_rush",
     "defteam_epa_allowed_pass",
+    "posteam_epa_this_game_rush",
+    "posteam_epa_this_game_pass",
+    "defteam_epa_allowed_this_game_rush",
+    "defteam_epa_allowed_this_game_pass",
 ]
 
 
@@ -39,26 +52,38 @@ def add_tendency_features(pbp: pl.DataFrame) -> pl.DataFrame:
 
     df = pbp.sort(_TIME_ORDER).with_columns(
         is_run.cast(pl.Int64).alias("_is_run"),
+        is_pass.cast(pl.Int64).alias("_is_pass"),
         is_scrimmage.cast(pl.Int64).alias("_is_scrimmage"),
         pl.when(is_run).then(pl.col("epa")).otherwise(0.0).alias("_rush_epa"),
-        pl.when(is_run).then(1).otherwise(0).alias("_is_rush_faced"),
         pl.when(is_pass).then(pl.col("epa")).otherwise(0.0).alias("_pass_epa"),
-        pl.when(is_pass).then(1).otherwise(0).alias("_is_pass_faced"),
     )
 
     return df.with_columns(
+        # Season-to-date.
         _prior_ratio("_is_run", "_is_scrimmage", ["season", "posteam"]).alias(
             "posteam_run_rate"
         ),
         _prior_ratio("_is_run", "_is_scrimmage", ["season", "posteam", "down"]).alias(
             "posteam_run_rate_this_down"
         ),
-        _prior_ratio("_rush_epa", "_is_rush_faced", ["season", "defteam"]).alias(
+        _prior_ratio("_rush_epa", "_is_run", ["season", "defteam"]).alias(
             "defteam_epa_allowed_rush"
         ),
-        _prior_ratio("_pass_epa", "_is_pass_faced", ["season", "defteam"]).alias(
+        _prior_ratio("_pass_epa", "_is_pass", ["season", "defteam"]).alias(
             "defteam_epa_allowed_pass"
         ),
-    ).drop(
-        ["_is_run", "_is_scrimmage", "_rush_epa", "_is_rush_faced", "_pass_epa", "_is_pass_faced"]
-    )
+        # This game only - same ratios, windowed to game_id instead of
+        # season, and computed for both sides of the ball.
+        _prior_ratio("_rush_epa", "_is_run", ["game_id", "posteam"]).alias(
+            "posteam_epa_this_game_rush"
+        ),
+        _prior_ratio("_pass_epa", "_is_pass", ["game_id", "posteam"]).alias(
+            "posteam_epa_this_game_pass"
+        ),
+        _prior_ratio("_rush_epa", "_is_run", ["game_id", "defteam"]).alias(
+            "defteam_epa_allowed_this_game_rush"
+        ),
+        _prior_ratio("_pass_epa", "_is_pass", ["game_id", "defteam"]).alias(
+            "defteam_epa_allowed_this_game_pass"
+        ),
+    ).drop(["_is_run", "_is_pass", "_is_scrimmage", "_rush_epa", "_pass_epa"])

@@ -46,6 +46,12 @@ class Situation(BaseModel):
     posteam_run_rate_this_down: float
     defteam_epa_allowed_rush: float
     defteam_epa_allowed_pass: float
+    # This-game-only versions of the same idea (see features.tendency) -
+    # captures in-game momentum a season average would dilute.
+    posteam_epa_this_game_rush: float
+    posteam_epa_this_game_pass: float
+    defteam_epa_allowed_this_game_rush: float
+    defteam_epa_allowed_this_game_pass: float
 
 
 @app.get("/status")

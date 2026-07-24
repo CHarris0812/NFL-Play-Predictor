@@ -18,6 +18,10 @@ const DEFAULT_SITUATION = {
   posteam_run_rate_this_down: 0.42,
   defteam_epa_allowed_rush: 0.0,
   defteam_epa_allowed_pass: 0.0,
+  posteam_epa_this_game_rush: 0.0,
+  posteam_epa_this_game_pass: 0.0,
+  defteam_epa_allowed_this_game_rush: 0.0,
+  defteam_epa_allowed_this_game_pass: 0.0,
 };
 
 const FIELDS = [
@@ -40,8 +44,20 @@ const FIELDS = [
 const TENDENCY_FIELDS = [
   { key: "posteam_run_rate", label: "Offense run rate (season)", step: 0.01 },
   { key: "posteam_run_rate_this_down", label: "Offense run rate on this down", step: 0.01 },
-  { key: "defteam_epa_allowed_rush", label: "Defense EPA allowed per rush", step: 0.01 },
-  { key: "defteam_epa_allowed_pass", label: "Defense EPA allowed per pass", step: 0.01 },
+  { key: "defteam_epa_allowed_rush", label: "Defense EPA allowed per rush (season)", step: 0.01 },
+  { key: "defteam_epa_allowed_pass", label: "Defense EPA allowed per pass (season)", step: 0.01 },
+  { key: "posteam_epa_this_game_rush", label: "Offense EPA per rush (this game)", step: 0.01 },
+  { key: "posteam_epa_this_game_pass", label: "Offense EPA per pass (this game)", step: 0.01 },
+  {
+    key: "defteam_epa_allowed_this_game_rush",
+    label: "Defense EPA allowed per rush (this game)",
+    step: 0.01,
+  },
+  {
+    key: "defteam_epa_allowed_this_game_pass",
+    label: "Defense EPA allowed per pass (this game)",
+    step: 0.01,
+  },
 ];
 
 // The model was trained on half_seconds_remaining (nflverse's own column),
@@ -128,10 +144,10 @@ export default function PredictTab() {
           </label>
         </div>
 
-        <h3>Team tendency (season-to-date)</h3>
+        <h3>Team tendency (season and this game)</h3>
         <p className="hint">
-          No team lookup yet - enter these manually. 0.42 run rate and 0.0 EPA allowed are
-          roughly league-average placeholders.
+          No team lookup yet - enter these manually. 0.42 run rate and 0.0 EPA are roughly
+          league-average placeholders; the "this game" ones are 0 since no game is in progress.
         </p>
         <div className="field-grid">
           {TENDENCY_FIELDS.map(({ key, label, step }) => (

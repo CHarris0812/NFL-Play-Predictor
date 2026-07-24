@@ -37,27 +37,35 @@ def _row(**overrides):
 
 
 def test_replay_returns_only_the_requested_game_in_play_order():
-    # Two prior weeks against a different game_id give both teams enough
-    # tendency history (see features/tendency.py) that the target game's
-    # own plays aren't dropped as "first play of the season" false starts.
-    warmup = [
+    # A prior week against a different game_id gives season-to-date
+    # tendency history; a run+pass warmup within the target game itself
+    # gives the in-game tendency features (features/tendency.py) their
+    # own required history too, so the two asserted rows below aren't
+    # dropped as "first play of this game" false starts. The warmup rows
+    # themselves are dropped for exactly that reason - they're the ones
+    # with no prior in-game history yet.
+    season_warmup = [
         _row(week=1, game_id="2023_01_AAA_BBB", play_type="run"),
         _row(week=1, game_id="2023_01_AAA_BBB", play_type="pass"),
+    ]
+    game_warmup = [
+        _row(week=2, game_id="2023_02_AAA_CCC", play_type="run"),
+        _row(week=2, game_id="2023_02_AAA_CCC", play_type="pass"),
     ]
     target_game = [
         _row(week=2, game_id="2023_02_AAA_CCC", play_type="pass", first_down=1),
         _row(week=2, game_id="2023_02_AAA_CCC", play_type="run", touchdown=1),
     ]
-    df = pl.DataFrame([*warmup, *target_game])
+    df = pl.DataFrame([*season_warmup, *game_warmup, *target_game])
 
     out = build_game_replay(df, "2023_02_AAA_CCC")
 
-    assert out["game_id"].to_list() == ["2023_02_AAA_CCC", "2023_02_AAA_CCC"]
+    assert out["game_id"].to_list() == ["2023_02_AAA_CCC"] * 2
     assert out.sort("play_id")["play_id"].to_list() == sorted(out["play_id"].to_list())
     assert out[PLAY_TYPE_COLUMN].to_list() == ["pass", "run"]
     assert out[OUTCOME_COLUMN].to_list() == ["first_down", "touchdown"]
-    assert out["posteam"].to_list() == ["AAA", "AAA"]
-    assert out["desc"].to_list() == ["some play description", "some play description"]
+    assert out["posteam"].to_list() == ["AAA"] * 2
+    assert out["desc"].to_list() == ["some play description"] * 2
 
 
 def test_replay_unknown_game_id_returns_empty():

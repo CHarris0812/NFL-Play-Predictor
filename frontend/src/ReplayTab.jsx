@@ -19,8 +19,12 @@ const FEATURE_LABELS = [
   { key: "is_home", label: "Offense is home" },
   { key: "posteam_run_rate", label: "Offense run rate (season)" },
   { key: "posteam_run_rate_this_down", label: "Offense run rate on this down" },
-  { key: "defteam_epa_allowed_rush", label: "Defense EPA allowed per rush" },
-  { key: "defteam_epa_allowed_pass", label: "Defense EPA allowed per pass" },
+  { key: "defteam_epa_allowed_rush", label: "Defense EPA allowed per rush (season)" },
+  { key: "defteam_epa_allowed_pass", label: "Defense EPA allowed per pass (season)" },
+  { key: "posteam_epa_this_game_rush", label: "Offense EPA per rush (this game)" },
+  { key: "posteam_epa_this_game_pass", label: "Offense EPA per pass (this game)" },
+  { key: "defteam_epa_allowed_this_game_rush", label: "Defense EPA allowed per rush (this game)" },
+  { key: "defteam_epa_allowed_this_game_pass", label: "Defense EPA allowed per pass (this game)" },
 ];
 
 function topChoice(probabilities) {
